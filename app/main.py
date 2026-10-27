@@ -2,7 +2,7 @@ import os, uuid
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse
 from fastapi import FastAPI, UploadFile, File, BackgroundTasks, HTTPException, Query
-from . import config, transcriber
+from . import config, transcriber, summarizer
 from .db import DB
 
 os.makedirs(config.DATA_DIR, exist_ok=True)
@@ -51,8 +51,17 @@ def transcript(fid: int):
             "segments": app.state.db.segments(fid)}
 
 @app.get("/search")
-def search(q: str = Query(..., min_length=1), limit: int = 20):
-    return {"query": q, "results": app.state.db.search(q, limit)}
+def search(q: str = Query(..., min_length=1), limit: int = 20, summarize: bool = True):
+    db = app.state.db
+    results = db.search(q, limit)
+    if summarize:
+        for r in results:
+            try:
+                r.update(summarizer.summarize(db, r))
+            except Exception:  # never fail the search
+                r.update(summary=summarizer.fallback(r["text"]), summary_source="fallback",
+                         context_start=r["start"], context_end=r["end"])
+    return {"query": q, "results": results}
 
 @app.get("/files/{fid}/audio")
 def audio(fid: int):

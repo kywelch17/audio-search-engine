@@ -11,6 +11,8 @@ class DB:
           created_at TEXT DEFAULT CURRENT_TIMESTAMP);
         CREATE TABLE IF NOT EXISTS segments(id INTEGER PRIMARY KEY, file_id INTEGER, idx INTEGER,
           start REAL, end REAL, text TEXT);
+        CREATE TABLE IF NOT EXISTS summaries(file_id INTEGER, segment_id INTEGER, summary TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(file_id, segment_id));
         CREATE VIRTUAL TABLE IF NOT EXISTS segments_fts USING fts5(text, content='segments', content_rowid='id');
         CREATE TRIGGER IF NOT EXISTS seg_ai AFTER INSERT ON segments BEGIN
           INSERT INTO segments_fts(rowid, text) VALUES (new.id, new.text); END;
@@ -48,8 +50,18 @@ class DB:
         if not terms:
             return []
         fts = " ".join('"' + t + '"' for t in terms)
-        sql = """SELECT f.id file_id, f.filename, s.start, s.end, s.text,
+        sql = """SELECT f.id file_id, f.filename, s.id segment_id, s.idx, s.start, s.end, s.text,
                  snippet(segments_fts, 0, '[', ']', '...', 12) snippet
                  FROM segments_fts JOIN segments s ON s.id=segments_fts.rowid
                  JOIN files f ON f.id=s.file_id WHERE segments_fts MATCH ? ORDER BY rank LIMIT ?"""
         return [dict(r) for r in self.q(sql, (fts, limit))]
+
+    def context(self, fid, idx, n):
+        return [dict(r) for r in self.q("SELECT idx,start,end,text FROM segments WHERE file_id=? AND idx BETWEEN ? AND ? ORDER BY idx", (fid, idx - n, idx + n))]
+
+    def get_summary(self, fid, sid):
+        r = self.q("SELECT summary FROM summaries WHERE file_id=? AND segment_id=?", (fid, sid)).fetchone()
+        return r[0] if r else None
+
+    def put_summary(self, fid, sid, summary):
+        self.q("INSERT OR REPLACE INTO summaries(file_id,segment_id,summary) VALUES(?,?,?)", (fid, sid, summary))
