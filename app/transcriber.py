@@ -8,5 +8,5 @@ def get_model():
 
 def transcribe(path):
     segments, info = get_model().transcribe(path)
-    segs = [{"start": s.start, "end": s.end, "text": s.text.strip()} for s in segments]
+    segs = [{"start": round(s.start, 3), "end": round(s.end, 3), "text": s.text.strip()} for s in segments]
     return segs, getattr(info, "language", None), getattr(info, "duration", None)
