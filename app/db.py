@@ -1,4 +1,4 @@
-import sqlite3, threading
+import re, sqlite3, threading
 _lock = threading.Lock()
 
 class DB:
@@ -29,8 +29,9 @@ class DB:
                (status, error, language, duration, fid))
 
     def add_segments(self, fid, segs):
-        for i, s in enumerate(segs):
-            self.q("INSERT INTO segments(file_id,idx,start,end,text) VALUES(?,?,?,?,?)", (fid, i, s["start"], s["end"], s["text"]))
+        rows = [(fid, i, s["start"], s["end"], s["text"]) for i, s in enumerate(segs)]
+        with _lock, self.conn:
+            self.conn.executemany("INSERT INTO segments(file_id,idx,start,end,text) VALUES(?,?,?,?,?)", rows)
 
     def get_file(self, fid):
         r = self.q("SELECT * FROM files WHERE id=?", (fid,)).fetchone()
@@ -43,7 +44,10 @@ class DB:
         return [dict(r) for r in self.q("SELECT idx,start,end,text FROM segments WHERE file_id=? ORDER BY idx", (fid,))]
 
     def search(self, query, limit=20):
-        fts = " ".join('"' + t.replace('"', '""') + '"' for t in query.split())
+        terms = re.findall(r"\w+", query)
+        if not terms:
+            return []
+        fts = " ".join('"' + t + '"' for t in terms)
         sql = """SELECT f.id file_id, f.filename, s.start, s.end, s.text,
                  snippet(segments_fts, 0, '[', ']', '...', 12) snippet
                  FROM segments_fts JOIN segments s ON s.id=segments_fts.rowid

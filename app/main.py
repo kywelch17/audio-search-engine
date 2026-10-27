@@ -1,10 +1,13 @@
 import os, uuid
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi import FastAPI, UploadFile, File, BackgroundTasks, HTTPException, Query
 from . import config, transcriber
 from .db import DB
 
 os.makedirs(config.DATA_DIR, exist_ok=True)
 app = FastAPI(title="Audio Search Engine")
+app.add_middleware(CORSMiddleware, allow_origins=config.CORS_ORIGINS, allow_methods=["*"], allow_headers=["*"], expose_headers=["Content-Range", "Accept-Ranges"])
 app.state.db = DB(config.DB_PATH)
 
 def run_job(db, fid, path):
@@ -22,7 +25,8 @@ async def upload(bg: BackgroundTasks, file: UploadFile = File(...)):
     up = os.path.join(config.DATA_DIR, "uploads"); os.makedirs(up, exist_ok=True)
     path = os.path.join(up, f"{uuid.uuid4().hex}_{os.path.basename(file.filename or 'audio')}")
     with open(path, "wb") as f:
-        f.write(await file.read())
+        while chunk := await file.read(1024 * 1024):
+            f.write(chunk)
     fid = db.add_file(file.filename, path)
     bg.add_task(run_job, db, fid, path)
     return {"id": fid, "status": "pending"}
@@ -49,3 +53,9 @@ def transcript(fid: int):
 @app.get("/search")
 def search(q: str = Query(..., min_length=1), limit: int = 20):
     return {"query": q, "results": app.state.db.search(q, limit)}
+
+@app.get("/files/{fid}/audio")
+def audio(fid: int):
+    f = _file(fid)
+    if not os.path.exists(f["path"]): raise HTTPException(404, "audio missing")
+    return FileResponse(f["path"], filename=f["filename"])
