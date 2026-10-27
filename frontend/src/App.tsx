@@ -124,7 +124,10 @@ export default function App() {
             : <ul className="results">{results.map((r, i) => (
               <li key={i} onClick={() => open(r.file_id, r.start)}>
                 <div className="rhead"><span className="name">{r.filename}</span><span className="ts">{api.fmt(r.start)}</span></div>
-                <div className="snip"><Snippet text={r.snippet} /></div></li>))}</ul>)}
+                {r.summary?.trim() ? <>
+                  <div className="summary">{r.summary}</div>
+                  <div className="snip sub"><Snippet text={r.snippet} /></div>
+                </> : <div className="snip"><Snippet text={r.snippet} /></div>}</li>))}</ul>)}
           {selected != null && (
             <section className="player">
               <h2>{selFile?.filename ?? `File ${selected}`}</h2>
