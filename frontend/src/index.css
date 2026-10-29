@@ -1,0 +1,7 @@
+@import 'tailwindcss';
+@theme {
+  --font-sans: Inter, system-ui, sans-serif;
+}
+mark {
+  @apply rounded-sm bg-amber-200 px-0.5 text-inherit;
+}

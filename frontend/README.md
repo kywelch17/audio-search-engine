@@ -20,6 +20,7 @@ If you serve the UI from another origin, add it to the backend's `ASE_CORS_ORIGI
 Build: `npm run build` (type-checks, outputs `dist/`); `npm run preview` to serve it.
 
 ## Features
+
 - Drag/drop or pick audio files; each upload polls `/files/{id}/status` until done/error.
 - Library list; click a file to open the player and transcript.
 - Debounced search (all words must match); `[hits]` render as `<mark>`; click a result to play from that second.
