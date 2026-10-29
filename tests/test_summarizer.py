@@ -108,3 +108,12 @@ def test_old_prompt_cache_ignored(client, monkeypatch):
     monkeypatch.setattr(summarizer.httpx, "post", fake_post(calls, "Fresh summary."))
     r = client.get("/search", params={"q": "delta"}).json()["results"][0]
     assert r["summary"] == "Fresh summary." and len(calls) == 1
+
+def test_headline_prompt_and_short_limit(client, monkeypatch):
+    llm_env(monkeypatch); calls = []
+    monkeypatch.setattr(summarizer.httpx, "post", fake_post(calls))
+    client.get("/search", params={"q": "delta"})
+    kw = calls[0][1]
+    sysmsg = kw["json"]["messages"][0]["content"]
+    assert "5 to 10 words" in sysmsg and "The speaker" in sysmsg and "The host" in sysmsg
+    assert kw["json"]["max_tokens"] <= 30 and summarizer.PROMPT_VERSION == 3

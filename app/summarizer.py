@@ -5,15 +5,14 @@ import httpx
 CONTEXT = 2          # neighbouring segments on each side
 FALLBACK_CHARS = 200
 TIMEOUT = float(os.getenv("ASE_LLM_TIMEOUT", "10"))
-PROMPT_VERSION = 2   # bump whenever the prompt changes; older cached summaries are ignored
+PROMPT_VERSION = 3   # bump whenever the prompt changes; older cached summaries are ignored
 SYSTEM_PROMPT = (
-    "You summarize excerpts of audio transcripts for a search results page. "
-    "Given the passage containing the search hit plus its surrounding context, write ONE or TWO short "
-    "sentences describing what is being discussed and the point being made, in your own words, "
-    "in the third person (e.g. 'The speaker explains...', 'A host argues...'). "
-    "Do NOT quote the transcript, do NOT restate or paraphrase it line by line, and do NOT list what "
-    "each speaker says in order. Abstract the topic and takeaway. "
-    "Reply with the summary only, no preamble."
+    "You write headline-style gists of audio transcript excerpts for a search results page. "
+    "Given the search hit and its surrounding context, reply with ONE headline of 5 to 10 words "
+    "capturing the topic and point, in your own words. "
+    "No filler or framing such as 'The speaker', 'The host', 'This excerpt' or 'Discusses'. "
+    "Do NOT quote or paraphrase the transcript. No trailing period, no quotes, no preamble. "
+    "Example: Pied Piper's middle-out compression and the Weissman score"
 )
 
 
@@ -35,7 +34,7 @@ def llm_summary(text, cfg, hit_text=None):
     r = httpx.post(
         cfg["base_url"].rstrip("/") + "/chat/completions",
         headers={"Authorization": f"Bearer {cfg['api_key']}"},
-        json={"model": cfg["model"], "temperature": 0.2, "max_tokens": 200, "messages": [
+        json={"model": cfg["model"], "temperature": 0.2, "max_tokens": 30, "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": user}]},
         timeout=TIMEOUT,
