@@ -3,7 +3,7 @@ export type Status = "pending" | "processing" | "done" | "error";
 export interface FileInfo { id: number; filename: string; status: Status; language?: string | null; duration?: number | null; created_at?: string }
 export interface Segment { idx: number; start: number; end: number; text: string }
 export interface Transcript { id: number; filename: string; status: Status; language: string | null; segments: Segment[] }
-export interface SearchResult { file_id: number; filename: string; start: number; end: number; text: string; snippet: string }
+export interface SearchResult { file_id: number; filename: string; start: number; end: number; text: string; snippet: string; summary?: string | null }
 
 async function j<T>(path: string, init?: RequestInit): Promise<T> {
   const r = await fetch(API + path, init);
