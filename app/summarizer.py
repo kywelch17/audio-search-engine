@@ -4,7 +4,17 @@ import httpx
 
 CONTEXT = 2          # neighbouring segments on each side
 FALLBACK_CHARS = 200
-TIMEOUT = float(os.getenv("ASE_LLM_TIMEOUT", "5"))
+TIMEOUT = float(os.getenv("ASE_LLM_TIMEOUT", "10"))
+PROMPT_VERSION = 2   # bump whenever the prompt changes; older cached summaries are ignored
+SYSTEM_PROMPT = (
+    "You summarize excerpts of audio transcripts for a search results page. "
+    "Given the passage containing the search hit plus its surrounding context, write ONE or TWO short "
+    "sentences describing what is being discussed and the point being made, in your own words, "
+    "in the third person (e.g. 'The speaker explains...', 'A host argues...'). "
+    "Do NOT quote the transcript, do NOT restate or paraphrase it line by line, and do NOT list what "
+    "each speaker says in order. Abstract the topic and takeaway. "
+    "Reply with the summary only, no preamble."
+)
 
 
 def llm_config():
@@ -20,13 +30,14 @@ def fallback(text):
     return cut + "..."
 
 
-def llm_summary(text, cfg):
+def llm_summary(text, cfg, hit_text=None):
+    user = f"Search hit: {hit_text}\n\nContext passage:\n{text}" if hit_text else text
     r = httpx.post(
         cfg["base_url"].rstrip("/") + "/chat/completions",
         headers={"Authorization": f"Bearer {cfg['api_key']}"},
-        json={"model": cfg["model"], "temperature": 0.2, "max_tokens": 120, "messages": [
-            {"role": "system", "content": "Summarize this audio transcript excerpt in 1-2 sentences. Reply with the summary only."},
-            {"role": "user", "content": text}]},
+        json={"model": cfg["model"], "temperature": 0.2, "max_tokens": 200, "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": user}]},
         timeout=TIMEOUT,
     )
     r.raise_for_status()
@@ -44,12 +55,12 @@ def summarize(db, hit):
            "context_end": ctx[-1]["end"] if ctx else hit["end"]}
     cfg = llm_config()
     if cfg:
-        cached = db.get_summary(hit["file_id"], hit["segment_id"])
+        cached = db.get_summary(hit["file_id"], hit["segment_id"], PROMPT_VERSION)
         if cached:
             return {**out, "summary": cached, "summary_source": "llm"}
         try:
-            s = llm_summary(text, cfg)
-            db.put_summary(hit["file_id"], hit["segment_id"], s)
+            s = llm_summary(text, cfg, hit.get("text"))
+            db.put_summary(hit["file_id"], hit["segment_id"], s, PROMPT_VERSION)
             return {**out, "summary": s, "summary_source": "llm"}
         except Exception:
             pass

@@ -17,6 +17,10 @@ class DB:
         CREATE TRIGGER IF NOT EXISTS seg_ai AFTER INSERT ON segments BEGIN
           INSERT INTO segments_fts(rowid, text) VALUES (new.id, new.text); END;
         """)
+        cols = [r[1] for r in self.conn.execute("PRAGMA table_info(summaries)")]
+        if "prompt_version" not in cols:  # rows from before versioning count as v1
+            self.conn.execute("ALTER TABLE summaries ADD COLUMN prompt_version INTEGER DEFAULT 1")
+            self.conn.commit()
 
     def q(self, sql, args=()):
         with _lock:
@@ -59,9 +63,11 @@ class DB:
     def context(self, fid, idx, n):
         return [dict(r) for r in self.q("SELECT idx,start,end,text FROM segments WHERE file_id=? AND idx BETWEEN ? AND ? ORDER BY idx", (fid, idx - n, idx + n))]
 
-    def get_summary(self, fid, sid):
-        r = self.q("SELECT summary FROM summaries WHERE file_id=? AND segment_id=?", (fid, sid)).fetchone()
+    def get_summary(self, fid, sid, version=1):
+        r = self.q("SELECT summary FROM summaries WHERE file_id=? AND segment_id=? AND prompt_version=?",
+                   (fid, sid, version)).fetchone()
         return r[0] if r else None
 
-    def put_summary(self, fid, sid, summary):
-        self.q("INSERT OR REPLACE INTO summaries(file_id,segment_id,summary) VALUES(?,?,?)", (fid, sid, summary))
+    def put_summary(self, fid, sid, summary, version=1):
+        self.q("INSERT OR REPLACE INTO summaries(file_id,segment_id,summary,prompt_version) VALUES(?,?,?,?)",
+               (fid, sid, summary, version))

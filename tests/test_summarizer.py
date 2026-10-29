@@ -86,3 +86,25 @@ def test_summarize_false(client, monkeypatch):
     monkeypatch.setattr(summarizer.httpx, "post", fake_post(calls))
     r = client.get("/search", params={"q": "delta", "summarize": "false"}).json()["results"][0]
     assert "summary" not in r and calls == []
+
+def test_prompt_is_abstractive_and_includes_hit(client, monkeypatch):
+    llm_env(monkeypatch); calls = []
+    monkeypatch.setattr(summarizer.httpx, "post", fake_post(calls))
+    client.get("/search", params={"q": "delta"})
+    msgs = calls[0][1]["json"]["messages"]
+    assert "do not quote" in msgs[0]["content"].lower()
+    assert "Search hit: sentence delta here" in msgs[1]["content"] and "foxtrot" in msgs[1]["content"]
+
+def test_default_timeout_is_10():
+    import importlib, os
+    os.environ.pop("ASE_LLM_TIMEOUT", None)
+    assert importlib.reload(summarizer).TIMEOUT == 10.0
+
+def test_old_prompt_cache_ignored(client, monkeypatch):
+    llm_env(monkeypatch); calls = []
+    from app import main
+    hit = client.get("/search", params={"q": "delta", "summarize": "false"}).json()["results"][0]
+    main.app.state.db.put_summary(hit["file_id"], hit["segment_id"], "stale v1 summary", 1)
+    monkeypatch.setattr(summarizer.httpx, "post", fake_post(calls, "Fresh summary."))
+    r = client.get("/search", params={"q": "delta"}).json()["results"][0]
+    assert r["summary"] == "Fresh summary." and len(calls) == 1
