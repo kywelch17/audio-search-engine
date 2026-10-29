@@ -31,12 +31,20 @@ export function ResultCard({
       </div>
       {summary ? (
         <>
-          <div className="mb-1 line-clamp-2 text-[15px] leading-snug font-medium">
+          <div className="mb-1 text-[15px] leading-snug font-medium">
             {summary}
           </div>
-          <div className="text-[13px] text-zinc-500">
-            <Snippet text={r.snippet} />
-          </div>
+          <details
+            className="text-[13px] text-zinc-500"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <summary className="cursor-pointer select-none">
+              Transcript snippet
+            </summary>
+            <div className="mt-1">
+              <Snippet text={r.snippet} />
+            </div>
+          </details>
         </>
       ) : (
         <div>

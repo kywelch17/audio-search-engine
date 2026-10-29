@@ -17,6 +17,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, Props>(
     const audioRef = useRef<HTMLAudioElement>(null);
     const pending = useRef(initialSeek);
     const [time, setTime] = useState(0);
+    const [showTranscript, setShowTranscript] = useState(false);
     const { segments, error, loading } = useTranscript(fileId);
     const seek = (t: number) => {
       const a = audioRef.current;
@@ -28,9 +29,19 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, Props>(
     useImperativeHandle(ref, () => ({ seek }));
     return (
       <section className="mt-6 rounded-xl border border-zinc-200 bg-white p-4">
-        <h2 className="mb-2 text-base font-semibold">
-          {file?.filename ?? `File ${fileId}`}
-        </h2>
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 className="text-base font-semibold">
+            {file?.filename ?? `File ${fileId}`}
+          </h2>
+          <button
+            type="button"
+            aria-pressed={showTranscript}
+            onClick={() => setShowTranscript((v) => !v)}
+            className="rounded-md border border-zinc-300 px-2.5 py-1 text-[13px] hover:border-indigo-600"
+          >
+            {showTranscript ? 'Hide transcript' : 'Show transcript'}
+          </button>
+        </div>
         <audio
           ref={audioRef}
           src={audioUrl(fileId)}
@@ -45,7 +56,7 @@ export const AudioPlayer = forwardRef<AudioPlayerHandle, Props>(
           }}
           onTimeUpdate={(e) => setTime(e.currentTarget.currentTime)}
         />
-        {loading ? (
+        {!showTranscript ? null : loading ? (
           <p className="text-[13px] text-zinc-500">Loading transcript…</p>
         ) : error ? (
           <p className="text-sm text-red-700">
